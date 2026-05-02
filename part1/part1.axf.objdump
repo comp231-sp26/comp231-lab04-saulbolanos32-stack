@@ -1,0 +1,211 @@
+
+/home/bolsa-28/comp231-lab04-saulbolanos32-stack/part1/part1.axf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <__cs3_interrupt_vector>:
+		/* r4 = base address of key data register
+		   r5 = base address of HEX0 display
+		   r6 = current count (0-9)
+		   r7 = scratch /temp for key reads */
+		
+		ldr r4, KEY_BASE
+   0:	e59f40fc 	ldr	r4, [pc, #252]	; 104 <KEY_BASE>
+		ldr r5, HEX_BASE
+   4:	e59f50fc 	ldr	r5, [pc, #252]	; 108 <HEX_BASE>
+		mov r6, #0  //count at 0
+   8:	e3a06000 	mov	r6, #0
+
+		bl 	display_digit //show initial zero
+   c:	eb000023 	bl	a0 <display_digit>
+          	b	loop
+  10:	eaffffff 	b	14 <loop>
+
+00000014 <loop>:
+
+loop:
+
+          // loop code here
+		ldr r7, [r4] //show initial val, read key register
+  14:	e5947000 	ldr	r7, [r4]
+		
+		and r0, r7, #0x1 //check key0(bit 0)
+  18:	e2070001 	and	r0, r7, #1
+		cmp r0, #0x1 
+  1c:	e3500001 	cmp	r0, #1
+		beq key0_pressed
+  20:	0a000009 	beq	4c <key0_pressed>
+
+		and r0, r7, #0x2 //check key1 (bit1)
+  24:	e2070002 	and	r0, r7, #2
+		cmp r0, #0x2
+  28:	e3500002 	cmp	r0, #2
+		beq key1_pressed
+  2c:	0a00000a 	beq	5c <key1_pressed>
+		
+		and r0, r7, #0x4 //check key2
+  30:	e2070004 	and	r0, r7, #4
+		cmp r0, #0x4
+  34:	e3500004 	cmp	r0, #4
+		beq key2_pressed
+  38:	0a00000c 	beq	70 <key2_pressed>
+
+		and r0, r7, #0x8 //check key3
+  3c:	e2070008 	and	r0, r7, #8
+		cmp r0, #0x8
+  40:	e3500008 	cmp	r0, #8
+		beq key3_pressed
+  44:	0a00000e 	beq	84 <key3_pressed>
+
+		b loop //nothing pressed then keep going thru loop
+  48:	eafffff1 	b	14 <loop>
+
+0000004c <key0_pressed>:
+
+//reset counter for key0
+key0_pressed:
+		bl wait_release_0 //wait until key released
+  4c:	eb000018 	bl	b4 <wait_release_0>
+		mov r6, #0  //reset count
+  50:	e3a06000 	mov	r6, #0
+		bl display_digit //update display
+  54:	eb000011 	bl	a0 <display_digit>
+		b loop
+  58:	eaffffed 	b	14 <loop>
+
+0000005c <key1_pressed>:
+
+//increment countand display num)
+key1_pressed:
+		bl wait_release_1
+  5c:	eb000019 	bl	c8 <wait_release_1>
+		cmp r6, #9 
+  60:	e3560009 	cmp	r6, #9
+		addlt r6, r6, #1  //add only if count less than 9
+  64:	b2866001 	addlt	r6, r6, #1
+		bl display_digit
+  68:	eb00000c 	bl	a0 <display_digit>
+		b loop
+  6c:	eaffffe8 	b	14 <loop>
+
+00000070 <key2_pressed>:
+
+//decrement count
+key2_pressed:
+		bl wait_release_2
+  70:	eb000019 	bl	dc <wait_release_2>
+		cmp r6, #0
+  74:	e3560000 	cmp	r6, #0
+		subgt r6, r6, #1  //subtract if count > 0
+  78:	c2466001 	subgt	r6, r6, #1
+		bl display_digit
+  7c:	eb000007 	bl	a0 <display_digit>
+		b loop
+  80:	eaffffe3 	b	14 <loop>
+
+00000084 <key3_pressed>:
+
+//blank the display
+key3_pressed:
+		bl wait_release_3
+  84:	eb000019 	bl	f0 <wait_release_3>
+		mov r0, #0 //0x00 = all segments off
+  88:	e3a00000 	mov	r0, #0
+		str r0, [r5]  //write to hex0
+  8c:	e5850000 	str	r0, [r5]
+		b loop
+  90:	eaffffdf 	b	14 <loop>
+
+00000094 <seg7_code>:
+
+
+
+//convert digit in r0 to 7 seg bit pattern
+seg7_code:  ldr     r1, =bit_codes  
+  94:	e59f1070 	ldr	r1, [pc, #112]	; 10c <HEX_BASE+0x4>
+            ldrb    r0, [r1, r0]    
+  98:	e7d10000 	ldrb	r0, [r1, r0]
+            bx      lr
+  9c:	e12fff1e 	bx	lr
+
+000000a0 <display_digit>:
+            
+
+//display r6 on HEX0
+display_digit: 
+			push {lr}
+  a0:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+	        mov     r0, r6          //put current count into r0 for seg7_code
+  a4:	e1a00006 	mov	r0, r6
+                bl      seg7_code       //returns 7-seg bit code in r0
+  a8:	ebfffff9 	bl	94 <seg7_code>
+                str     r0, [r5]        //write bit code to HEX0
+  ac:	e5850000 	str	r0, [r5]
+                pop {lr}
+  b0:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+
+000000b4 <wait_release_0>:
+          
+
+// wait_release subroutines: spin until the key is no longer held
+wait_release_0:
+	        ldr  r0, [r4]
+  b4:	e5940000 	ldr	r0, [r4]
+	        and  r0, r0, #0x1
+  b8:	e2000001 	and	r0, r0, #1
+       		cmp  r0, #0x1
+  bc:	e3500001 	cmp	r0, #1
+		beq  wait_release_0
+  c0:	0afffffb 	beq	b4 <wait_release_0>
+       		bx   lr
+  c4:	e12fff1e 	bx	lr
+
+000000c8 <wait_release_1>:
+
+wait_release_1:
+        	ldr  r0, [r4]
+  c8:	e5940000 	ldr	r0, [r4]
+        	and  r0, r0, #0x2
+  cc:	e2000002 	and	r0, r0, #2
+        	cmp  r0, #0x2
+  d0:	e3500002 	cmp	r0, #2
+        	beq  wait_release_1
+  d4:	0afffffb 	beq	c8 <wait_release_1>
+        	bx   lr
+  d8:	e12fff1e 	bx	lr
+
+000000dc <wait_release_2>:
+
+wait_release_2:
+        	ldr  r0, [r4]
+  dc:	e5940000 	ldr	r0, [r4]
+        	and  r0, r0, #0x4
+  e0:	e2000004 	and	r0, r0, #4
+        	cmp  r0, #0x4
+  e4:	e3500004 	cmp	r0, #4
+        	beq  wait_release_2
+  e8:	0afffffb 	beq	dc <wait_release_2>
+        	bx   lr
+  ec:	e12fff1e 	bx	lr
+
+000000f0 <wait_release_3>:
+
+wait_release_3:
+        	ldr  r0, [r4]
+  f0:	e5940000 	ldr	r0, [r4]
+        	and  r0, r0, #0x8
+  f4:	e2000008 	and	r0, r0, #8
+        	cmp  r0, #0x8
+  f8:	e3500008 	cmp	r0, #8
+        	beq  wait_release_3
+  fc:	0afffffb 	beq	f0 <wait_release_3>
+        	bx   lr
+ 100:	e12fff1e 	bx	lr
+
+00000104 <KEY_BASE>:
+ 104:	ff200050 	.word	0xff200050
+
+00000108 <HEX_BASE>:
+ 108:	ff200020 	.word	0xff200020
+ 10c:	00000128 	.word	0x00000128

@@ -1,0 +1,285 @@
+
+/home/bolsa-28/comp231-lab04-saulbolanos32-stack/part4/part4.axf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <__cs3_interrupt_vector>:
+	   r6 = hundreths counter 
+	   r7 = seconds counter
+	   r8 = timer state
+	   r9 = timer base adress */
+
+	ldr r4, edge_base 
+   0:	e59f4168 	ldr	r4, [pc, #360]	; 170 <edge_base>
+	ldr r5, hex_base
+   4:	e59f5168 	ldr	r5, [pc, #360]	; 174 <hex_base>
+	ldr r9, timer_base
+   8:	e59f9168 	ldr	r9, [pc, #360]	; 178 <timer_base>
+	mov r6, #0 //hundreths starts at 0
+   c:	e3a06000 	mov	r6, #0
+	mov r7, #0 //seconds at 0 too
+  10:	e3a07000 	mov	r7, #0
+	mov r8, #0  //timer starts stopped
+  14:	e3a08000 	mov	r8, #0
+
+	mov r0, #0xF //clear edge capture register on start
+  18:	e3a0000f 	mov	r0, #15
+	str r0, [r4]
+  1c:	e5840000 	str	r0, [r4]
+
+	ldr r0, =2000000 //2 million ticks is 0.01 seconds at 200MHz
+  20:	e59f0154 	ldr	r0, [pc, #340]	; 17c <timer_base+0x4>
+	str r0, [r9] //write to load register
+  24:	e5890000 	str	r0, [r9]
+
+	mov r0, #1 //clear f bit on startup (just in case)
+  28:	e3a00001 	mov	r0, #1
+	str r0, [r9, #12] //write to interrupt status reg
+  2c:	e589000c 	str	r0, [r9, #12]
+
+	bl display_time //show time 0:00
+  30:	eb000022 	bl	c0 <display_time>
+
+00000034 <loop>:
+
+loop:
+
+          // loop code here
+	// first check keypress
+	ldr r0, [r4] 
+  34:	e5940000 	ldr	r0, [r4]
+	cmp r0, #0 //any key pressed?
+  38:	e3500000 	cmp	r0, #0
+	beq check_timer //if not skip to timer check
+  3c:	0a00000e 	beq	7c <check_timer>
+
+	//else, clear edgeg capture and toggle timer
+	mov r0, #0xF
+  40:	e3a0000f 	mov	r0, #15
+	str r0, [r4] //clear edge capture
+  44:	e5840000 	str	r0, [r4]
+	
+	cmp r8, #0 
+  48:	e3580000 	cmp	r8, #0
+	beq start_timer //if stopped (0) then start running
+  4c:	0a000000 	beq	54 <start_timer>
+	b stop_timer //else stop timer
+  50:	ea000005 	b	6c <stop_timer>
+
+00000054 <start_timer>:
+start_timer:
+	mov r8, #1  //mark running (to be sure)
+  54:	e3a08001 	mov	r8, #1
+	
+	//reset timer too
+	ldr r0, =2000000
+  58:	e59f011c 	ldr	r0, [pc, #284]	; 17c <timer_base+0x4>
+	str r0, [r9]
+  5c:	e5890000 	str	r0, [r9]
+
+	mov r0, #0b11
+  60:	e3a00003 	mov	r0, #3
+	str r0, [r9, #8] 
+  64:	e5890008 	str	r0, [r9, #8]
+	b loop
+  68:	eafffff1 	b	34 <loop>
+
+0000006c <stop_timer>:
+
+stop_timer:
+	mov r8, #0 //mark stopped
+  6c:	e3a08000 	mov	r8, #0
+	
+	//write 0
+	mov r0, #0
+  70:	e3a00000 	mov	r0, #0
+	str r0, [r9, #8] //write to control register
+  74:	e5890008 	str	r0, [r9, #8]
+	b loop
+  78:	eaffffed 	b	34 <loop>
+
+0000007c <check_timer>:
+
+check_timer:
+	cmp r8, #0 //if timer stopped, keep polling
+  7c:	e3580000 	cmp	r8, #0
+	beq loop
+  80:	0affffeb 	beq	34 <loop>
+	//has .01 second passed as well?
+	ldr r0, [r9, #12] //read interrupt status register
+  84:	e599000c 	ldr	r0, [r9, #12]
+	and r0, r0, #1 //isolate f bit
+  88:	e2000001 	and	r0, r0, #1
+	cmp r0, #1
+  8c:	e3500001 	cmp	r0, #1
+	bne loop //if f not set go to loop
+  90:	1affffe7 	bne	34 <loop>
+	
+	//if set, clear f bit
+	mov r0, #1
+  94:	e3a00001 	mov	r0, #1
+	str r0, [r9, #12]
+  98:	e589000c 	str	r0, [r9, #12]
+
+	//update time counters
+	
+	//hundreths
+	add r6, r6, #1
+  9c:	e2866001 	add	r6, r6, #1
+	cmp r6, #100 
+  a0:	e3560064 	cmp	r6, #100	; 0x64
+	bne display_and_loop//if hundreths hasnt hit 100, just update display
+  a4:	1a000003 	bne	b8 <display_and_loop>
+
+	//dd hit 100
+	mov r6, #0 
+  a8:	e3a06000 	mov	r6, #0
+	add r7, r7, #1 //increment seconds once hundreths hit 100
+  ac:	e2877001 	add	r7, r7, #1
+	cmp r7, #60  //if seconds hit 60, reset it 
+  b0:	e357003c 	cmp	r7, #60	; 0x3c
+	moveq r7, #0
+  b4:	03a07000 	moveq	r7, #0
+
+000000b8 <display_and_loop>:
+
+display_and_loop:
+	bl display_time  //update dipslay
+  b8:	eb000000 	bl	c0 <display_time>
+	b loop
+  bc:	eaffffdc 	b	34 <loop>
+
+000000c0 <display_time>:
+
+//r7 = seconds r6 = hundreths
+//one 32 bit word (hex3|hex2|hex1|hex0)
+display_time:
+	push {lr}
+  c0:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+
+	mov r0, r6
+  c4:	e1a00006 	mov	r0, r6
+	bl ones_digit
+  c8:	eb000019 	bl	134 <ones_digit>
+	bl seg7_code 
+  cc:	eb000024 	bl	164 <seg7_code>
+	mov r10, r0 //all above is getting ones digit
+  d0:	e1a0a000 	mov	r10, r0
+
+	//get 10s digit 
+	mov r0, r6
+  d4:	e1a00006 	mov	r0, r6
+	bl tens_digit
+  d8:	eb00000f 	bl	11c <tens_digit>
+	bl seg7_code 
+  dc:	eb000020 	bl	164 <seg7_code>
+	lsl r0, r0, #8 //shift to bit 15-8 for hex1
+  e0:	e1a00400 	lsl	r0, r0, #8
+	orr r10, r10, r0 //combine with hex0
+  e4:	e18aa000 	orr	r10, r10, r0
+
+	//het hex2 ones digit of ss
+	mov r0, r7 
+  e8:	e1a00007 	mov	r0, r7
+	bl ones_digit
+  ec:	eb000010 	bl	134 <ones_digit>
+	bl seg7_code
+  f0:	eb00001b 	bl	164 <seg7_code>
+	lsl r0, r0, #16
+  f4:	e1a00800 	lsl	r0, r0, #16
+	orr r10, r10, r0 //combine with prev
+  f8:	e18aa000 	orr	r10, r10, r0
+
+	 //get hex3 tens digit of seconds
+        mov r0, r7
+  fc:	e1a00007 	mov	r0, r7
+        bl tens_digit
+ 100:	eb000005 	bl	11c <tens_digit>
+        bl seg7_code
+ 104:	eb000016 	bl	164 <seg7_code>
+        lsl r0, r0, #24 // shift to bits 31-24 for hex3
+ 108:	e1a00c00 	lsl	r0, r0, #24
+        orr r10, r10, r0 // combine with rest
+ 10c:	e18aa000 	orr	r10, r10, r0
+
+	str r10, [r5] //write all 4 digits to hex3-hex0
+ 110:	e585a000 	str	r10, [r5]
+
+	pop {lr}
+ 114:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+	bx lr //now return allat
+ 118:	e12fff1e 	bx	lr
+
+0000011c <tens_digit>:
+
+tens_digit:
+	push {lr}
+ 11c:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+	mov r1, #10
+ 120:	e3a0100a 	mov	r1, #10
+	bl divide
+ 124:	eb000007 	bl	148 <divide>
+	mov r0, r2
+ 128:	e1a00002 	mov	r0, r2
+	pop {lr}
+ 12c:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+	bx lr
+ 130:	e12fff1e 	bx	lr
+
+00000134 <ones_digit>:
+
+ones_digit:
+	push {lr}
+ 134:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+	mov r1, #10
+ 138:	e3a0100a 	mov	r1, #10
+	bl divide
+ 13c:	eb000001 	bl	148 <divide>
+	pop {lr}
+ 140:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+	bx lr
+ 144:	e12fff1e 	bx	lr
+
+00000148 <divide>:
+divide:
+	mov r2, #0
+ 148:	e3a02000 	mov	r2, #0
+
+0000014c <div_loop>:
+div_loop:
+	cmp r0, r1
+ 14c:	e1500001 	cmp	r0, r1
+	blt div_done
+ 150:	ba000002 	blt	160 <div_done>
+	sub r0, r0, r1
+ 154:	e0400001 	sub	r0, r0, r1
+	add r2, r2, #1
+ 158:	e2822001 	add	r2, r2, #1
+	b div_loop
+ 15c:	eafffffa 	b	14c <div_loop>
+
+00000160 <div_done>:
+div_done:
+	bx lr
+ 160:	e12fff1e 	bx	lr
+
+00000164 <seg7_code>:
+
+seg7_code:  ldr     r1, =bit_codes  
+ 164:	e59f1014 	ldr	r1, [pc, #20]	; 180 <timer_base+0x8>
+            ldrb    r0, [r1, r0]    
+ 168:	e7d10000 	ldrb	r0, [r1, r0]
+            bx      lr              
+ 16c:	e12fff1e 	bx	lr
+
+00000170 <edge_base>:
+ 170:	ff200050 	.word	0xff200050
+
+00000174 <hex_base>:
+ 174:	ff200020 	.word	0xff200020
+
+00000178 <timer_base>:
+ 178:	fffec600 	.word	0xfffec600
+ 17c:	001e8480 	.word	0x001e8480
+ 180:	00000198 	.word	0x00000198

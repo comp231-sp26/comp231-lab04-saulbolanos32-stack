@@ -1,0 +1,197 @@
+
+/home/bolsa-28/comp231-lab04-saulbolanos32-stack/part2/part2.axf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <__cs3_interrupt_vector>:
+           r5 = HEX0-1 base address (0xFF200020)
+           r6 = current count (0 to 99)
+       	   r7 = scratch / delay counter
+           r8 = timer state (0=stopped, 1=running) */
+
+	ldr  r4, EDGE_BASE      // load edge-capture address
+   0:	e59f40e4 	ldr	r4, [pc, #228]	; ec <EDGE_BASE>
+        ldr  r5, HEX_BASE       // load hex base address
+   4:	e59f50e4 	ldr	r5, [pc, #228]	; f0 <HEX_BASE>
+        mov  r6, #0             // count timer at 0
+   8:	e3a06000 	mov	r6, #0
+        mov  r8, #0             // timer starts stopped
+   c:	e3a08000 	mov	r8, #0
+
+        // clear edge-capture register on startup
+        mov  r7, #0xF
+  10:	e3a0700f 	mov	r7, #15
+        str  r7, [r4]
+  14:	e5847000 	str	r7, [r4]
+
+        bl   display_count      // show 00 on startup
+  18:	eb000011 	bl	64 <display_count>
+
+0000001c <loop>:
+
+loop:
+
+          // loop code here
+	ldr r7, [r4]  //read edge-capture reg
+  1c:	e5947000 	ldr	r7, [r4]
+	cmp r7, #0   
+  20:	e3570000 	cmp	r7, #0
+	beq check_running //break if key not pressed
+  24:	0a000004 	beq	3c <check_running>
+
+	//id pressed: clear edge-capture and toggle state
+	mov r7, #0xF
+  28:	e3a0700f 	mov	r7, #15
+	str r7, [r4] //clearing edge capture
+  2c:	e5847000 	str	r7, [r4]
+	cmp r8, #0
+  30:	e3580000 	cmp	r8, #0
+	moveq r8, #1   //was stopped, now running
+  34:	03a08001 	moveq	r8, #1
+	movne r8, #0  //was running, now stopped
+  38:	13a08000 	movne	r8, #0
+
+0000003c <check_running>:
+
+check_running:
+	cmp r8, #0 //check timer
+  3c:	e3580000 	cmp	r8, #0
+	beq loop //if stopped, keep polling
+  40:	0afffff5 	beq	1c <loop>
+
+	//if running, do delay, then add and display
+	ldr r7, =200000000 
+  44:	e59f70a8 	ldr	r7, [pc, #168]	; f4 <HEX_BASE+0x4>
+
+00000048 <sub_loop>:
+
+sub_loop:
+	subs r7, r7, #1
+  48:	e2577001 	subs	r7, r7, #1
+	bne sub_loop
+  4c:	1afffffd 	bne	48 <sub_loop>
+	
+	//increment count
+	add r6, r6, #1
+  50:	e2866001 	add	r6, r6, #1
+	cmp r6, #100
+  54:	e3560064 	cmp	r6, #100	; 0x64
+	moveq r6, #0  //reset when reaching 100
+  58:	03a06000 	moveq	r6, #0
+	
+	bl display_count //update display
+  5c:	eb000000 	bl	64 <display_count>
+	b loop
+  60:	eaffffed 	b	1c <loop>
+
+00000064 <display_count>:
+
+//split r6 into tens and ones, looks up both, and combines into one word
+display_count:
+	push {lr}
+  64:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+	mov r0, r6
+  68:	e1a00006 	mov	r0, r6
+	bl ones_digit //returns one digit in r0
+  6c:	eb000009 	bl	98 <ones_digit>
+	bl seg7_code //return 7 seg encode
+  70:	eb00001a 	bl	e0 <seg7_code>
+	mov r9, r0   //save the ones spot
+  74:	e1a09000 	mov	r9, r0
+
+	//get 10s
+	mov r0, r6
+  78:	e1a00006 	mov	r0, r6
+	bl tens_digit 
+  7c:	eb00000a 	bl	ac <tens_digit>
+	bl seg7_code
+  80:	eb000016 	bl	e0 <seg7_code>
+
+	//combine ones and tens hex1 bits 15-8 hex0 bits 7-0
+	lsl r0, r0, #8 // hex1 is in bits 15-8, so put bit in position before ORing
+  84:	e1a00400 	lsl	r0, r0, #8
+	orr r0, r0, r9  // or in ones encoding LOOKED UP OPERATOR preforms bitwiser or operation
+  88:	e1800009 	orr	r0, r0, r9
+	str r0, [r5] //write both digits to hex1-hex0
+  8c:	e5850000 	str	r0, [r5]
+
+	pop {lr}
+  90:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+	bx lr
+  94:	e12fff1e 	bx	lr
+
+00000098 <ones_digit>:
+
+//returns r6 % 10 in r0
+ones_digit:
+	push {lr}
+  98:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+	mov r1, #10
+  9c:	e3a0100a 	mov	r1, #10
+	bl divide //r2 = quotient, r0 = remainder
+  a0:	eb000007 	bl	c4 <divide>
+	//r0 already holds remainder
+	pop {lr}
+  a4:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+	bx lr
+  a8:	e12fff1e 	bx	lr
+
+000000ac <tens_digit>:
+
+//returns r6 /10 in r0
+tens_digit:
+	push {lr}
+  ac:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+	mov r1, #10
+  b0:	e3a0100a 	mov	r1, #10
+	bl divide
+  b4:	eb000002 	bl	c4 <divide>
+	mov r0, r2
+  b8:	e1a00002 	mov	r0, r2
+	pop {lr}
+  bc:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+	bx lr
+  c0:	e12fff1e 	bx	lr
+
+000000c4 <divide>:
+
+divide:
+	mov r2, #0
+  c4:	e3a02000 	mov	r2, #0
+
+000000c8 <div_loop>:
+div_loop:
+	cmp r0,r1
+  c8:	e1500001 	cmp	r0, r1
+	blt div_done
+  cc:	ba000002 	blt	dc <div_done>
+	sub r0, r0, r1 
+  d0:	e0400001 	sub	r0, r0, r1
+	add r2,r2, #1
+  d4:	e2822001 	add	r2, r2, #1
+	b div_loop
+  d8:	eafffffa 	b	c8 <div_loop>
+
+000000dc <div_done>:
+div_done:
+	//r0 now holds remainde, r2 holds quotient
+	bx lr
+  dc:	e12fff1e 	bx	lr
+
+000000e0 <seg7_code>:
+
+seg7_code:  ldr     r1, =bit_codes  
+  e0:	e59f1010 	ldr	r1, [pc, #16]	; f8 <HEX_BASE+0x8>
+            ldrb    r0, [r1, r0]    
+  e4:	e7d10000 	ldrb	r0, [r1, r0]
+            bx      lr              
+  e8:	e12fff1e 	bx	lr
+
+000000ec <EDGE_BASE>:
+  ec:	ff20005c 	.word	0xff20005c
+
+000000f0 <HEX_BASE>:
+  f0:	ff200020 	.word	0xff200020
+  f4:	0bebc200 	.word	0x0bebc200
+  f8:	00000110 	.word	0x00000110
